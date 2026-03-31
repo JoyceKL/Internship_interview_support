@@ -1,0 +1,24 @@
+Nguyen Van A
+Email: nguyenvana@example.com
+Phone: +84 912 345 678
+LinkedIn: https://linkedin.com/in/nguyenvana
+GitHub: https://github.com/nguyenvana
+
+Summary
+Final-year Information Technology student seeking a Backend Intern role. Built APIs and data pipelines in university projects.
+
+Education
+University of Technology - GPA 3.4/4.0
+
+Skills
+Python, Java, FastAPI, SQL, PostgreSQL, Git, Docker
+
+Projects
+- Built internship management API with FastAPI and PostgreSQL, reduced manual tracking time by 40%.
+- Implemented JWT authentication and role-based access control for 3 user roles.
+
+Experience
+- Interned at ABC Software, supported bug fixing and API testing for internal products.
+
+Certifications
+- TOEIC 785
