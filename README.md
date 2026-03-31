@@ -1,27 +1,32 @@
-# Internship Interview Support MVP
+# Internship Interview Support
 
-Ứng dụng hỗ trợ giảng viên phân tích CV sinh viên thực tập và tạo bộ Interview Q&A cá nhân hóa.
+Repo hiện chứa đồng thời:
+- **V1 (MVP local Streamlit)** giữ nguyên để tương thích ngược.
+- **V2 (production-ready foundation)** backend FastAPI tách riêng, có auth JWT, multi-tenant, analytics, OpenAI structured outputs, versioning dữ liệu CV/review/interview.
 
-## 1) Tính năng chính
-- Upload CV PDF/DOCX và trích xuất thông tin chính.
-- Chấm điểm CV theo rubric 0-10 từng nhóm và quy đổi tổng 0-100.
-- Phân tích keyword gap giữa CV và JD.
-- Sinh bộ Interview Q&A:
-  - Chế độ thường: 15 câu
-  - Chế độ chuyên sâu: 25 câu
-- Lưu lịch sử phân tích vào SQLite.
-- Export báo cáo Markdown và DOCX (lecturer/student).
+## 1) Kiến trúc Ver2
 
-## 2) Kiến trúc
-- **UI**: Streamlit (`app.py`, `ui/`)
-- **Parser**: `parsers/` (PDF/DOCX + heuristic section extraction)
-- **Business services**: `services/` (scoring, review, Q&A, LLM wrapper)
-- **Persistence**: `storage/db.py` (SQLite)
-- **Export**: `exports/report_exporter.py`
-- **Schema**: `models/schemas.py` (Pydantic)
-- **Prompt templates**: `prompts/templates.py`
+```text
+backend/
+  api/                      # API router tổng
+  core/                     # config + shared schemas
+  auth/                     # JWT, dependency authn/authz
+  tenants/                  # tenant endpoints
+  users/                    # lecturer endpoints
+  students/                 # student CRUD
+  cv/                       # upload/parse/review + versioning
+  interviews/               # generate Q&A + versioning
+  analytics/                # dashboard JSON endpoints
+  prompts/                  # domain configs + prompt context
+  integrations/openai/      # adapter structured output + retry
+  storage/                  # SQLAlchemy models/session/seed
+  exports/                  # markdown/docx export
+  alembic/                  # migrations
+  tests/                    # v2 tests
+```
 
-## 3) Cài đặt
+## 2) Chạy local
+
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -29,53 +34,97 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-## 4) Biến môi trường
-- `OPENAI_API_KEY`: API key OpenAI
-- `OPENAI_MODEL`: model dùng cho giai đoạn mở rộng LLM
-- `APP_DB_PATH`: file SQLite
-- `LOG_LEVEL`: mức log
-
-## 5) Chạy local
+### Run API (V2)
 ```bash
-streamlit run app.py
+make run-api
 ```
+Swagger: `http://localhost:8000/docs`
 
-## 6) Chạy test
+### Run UI cũ (V1)
 ```bash
-pytest -q
+make run-ui
 ```
 
-## 7) Cấu trúc thư mục
-```
-.
-├── app.py
-├── ui/
-├── parsers/
-├── services/
-├── prompts/
-├── models/
-├── storage/
-├── exports/
-├── tests/
-├── sample_data/
-├── requirements.txt
-├── .env.example
-└── README.md
+## 3) Database & Migration
+
+- Ver2 target: PostgreSQL.
+- Local test có thể dùng SQLite.
+
+```bash
+make migrate
+make seed
 ```
 
-## 8) Màn hình chính (mô tả)
-- Sidebar: Upload CV, JD, target role, language, QA mode.
-- Main tabs: CV Review, Interview Q&A, History, Settings.
-- Nút chính: Analyze CV, Export Markdown/DOCX.
+## 4) Docker
 
-## 9) Giả định triển khai
-- CV dạng text-selectable (không OCR).
-- Scoring hiện tại là heuristic + rule-based để đảm bảo chạy ổn định.
-- OpenAI client đã đóng gói sẵn để nâng cấp giai đoạn 2 (FastAPI backend).
+```bash
+docker compose up --build
+```
 
-## 10) Hướng phát triển v2
-- Tách backend FastAPI (REST API + auth).
-- Dùng OpenAI để tinh chỉnh parsing/review/Q&A JSON có kiểm thử chặt.
-- Bổ sung multi-tenant lecturer accounts.
-- Dashboard thống kê theo lớp/khóa.
-- Tự động gợi ý cải tiến CV theo domain cụ thể (FE/BE/DA/QA/BA/AI).
+## 5) Auth & Multi-tenant
+
+- Register lecturer: tự tạo tenant nếu chưa có.
+- Login trả access + refresh JWT.
+- `tenant_id` xuyên suốt model và query scope.
+- API layer dùng `get_current_user`, `get_current_tenant_id` để guard truy cập chéo tenant.
+
+## 6) OpenAI Integration
+
+3 tác vụ chính:
+- `parse_cv_to_structured_json`
+- `review_cv_against_rubric`
+- `generate_interview_questions`
+
+Cơ chế:
+- Structured output theo JSON schema (Pydantic schema).
+- Validate sau khi nhận output.
+- Retry có kiểm soát (`OPENAI_MAX_RETRIES`).
+- Nếu thất bại: fallback deterministic từ logic V1.
+- Nguyên tắc chống bịa: thiếu dữ liệu => `unknown` hoặc `cần bổ sung`.
+
+## 7) Domain-specific engine
+
+Domain hỗ trợ: **FE, BE, DA, QA, BA, AI**.
+Mỗi domain có config riêng trong `backend/prompts/domains/*.json`:
+- rubric
+- keyword packs
+- checklist
+- interview focus
+
+## 8) Endpoint chính
+
+- `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`
+- `/tenants/current`
+- `/lecturers`
+- `/students` (POST/GET/PATCH)
+- `/cv/upload`, `/cv/{cv_id}/parse`, `/cv/{cv_id}/review`
+- `/interview/{cv_id}/generate`
+- `/analytics/dashboard`
+- `/exports/{cv_id}/markdown`, `/exports/{cv_id}/docx`
+- `/health`
+
+## 9) Test
+
+```bash
+make test
+```
+
+Bao gồm:
+- auth flow
+- tenant isolation
+- schema validation
+- export tests
+- e2e flow: register -> login -> create student -> upload CV -> parse -> review -> generate Q&A -> analytics
+
+## 10) Tích hợp frontend
+
+- V1 Streamlit có thể gọi REST API dần thay cho gọi trực tiếp service local.
+- Khuyến nghị rollout theo bước:
+  1. streamlit upload + auth gọi backend.
+  2. chuyển parse/review/qa sang API.
+  3. chuyển lịch sử + dashboard sang API.
+
+## 11) Lưu ý kỹ thuật
+
+- Trong môi trường production PostgreSQL, analytics monthly trend nên dùng `date_trunc` thay cho `strftime` (TODO).
+- V1 logic vẫn được tái sử dụng làm fallback để giữ khả năng chạy end-to-end ổn định.
