@@ -1,0 +1,1 @@
+{"domain":"QA","rubric":["test_case_design","bug_reporting","regression_strategy","api_testing","quality_mindset"],"keywords":["test case","bug","regression","postman","qa"],"checklist":["severity/priority logic","repro steps","coverage mapping"],"interview_focus":["edge cases","root cause reasoning","test planning"]}
