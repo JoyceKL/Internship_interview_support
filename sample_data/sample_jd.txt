@@ -1,0 +1,8 @@
+Backend Intern responsibilities:
+- Build and maintain REST APIs.
+- Work with SQL databases.
+- Collaborate with frontend and QA.
+Requirements:
+- Python or Java
+- Understanding of Git, Docker, and testing basics
+- Good communication and growth mindset
