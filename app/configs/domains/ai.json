@@ -1,0 +1,1 @@
+{"domain":"AI","rubric":["python_ml_basics","data_preprocessing","model_evaluation","experiment_tracking","deployment_awareness"],"keywords":["python","machine learning","preprocessing","f1","deployment","inference"],"checklist":["dataset split","metric justification","error analysis"],"interview_focus":["bias/variance","evaluation tradeoff","serving constraints"]}

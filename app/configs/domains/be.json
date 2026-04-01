@@ -1,0 +1,1 @@
+{"domain":"BE","rubric":["api_design","database_modeling","auth_security","caching_basics","testing"],"keywords":["api","sql","database","auth","cache","pytest"],"checklist":["endpoint examples","db schema reasoning","error handling"],"interview_focus":["api contracts","transaction consistency","scalability basics"]}

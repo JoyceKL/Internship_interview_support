@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +18,10 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4.1-mini"
     openai_max_retries: int = 2
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+    data_dir: Path = Path("data")
+    cv_upload_dir: Path = Path("data/uploads/cv")
+    jd_upload_dir: Path = Path("data/uploads/jd")
+    exports_dir: Path = Path("data/exports")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
