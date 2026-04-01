@@ -77,7 +77,10 @@ class CV(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     file_name: Mapped[str] = mapped_column(String(255))
-    raw_text: Mapped[str] = mapped_column(Text)
+    file_path: Mapped[str] = mapped_column(String(500), default="")
+    mime_type: Mapped[str] = mapped_column(String(100), default="text/plain")
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    raw_text: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[int] = mapped_column(ForeignKey("lecturers.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -8,6 +8,7 @@ Repo hiện chứa đồng thời:
 
 ```text
 backend/
+app/                      # compatibility namespace theo yêu cầu Ver2 (re-export từ backend/*)
   api/                      # API router tổng
   core/                     # config + shared schemas
   auth/                     # JWT, dependency authn/authz
@@ -128,3 +129,12 @@ Bao gồm:
 
 - Trong môi trường production PostgreSQL, analytics monthly trend nên dùng `date_trunc` thay cho `strftime` (TODO).
 - V1 logic vẫn được tái sử dụng làm fallback để giữ khả năng chạy end-to-end ổn định.
+
+
+## 12) Cấu trúc dữ liệu local
+
+```text
+data/uploads/cv
+data/uploads/jd
+data/exports
+```
