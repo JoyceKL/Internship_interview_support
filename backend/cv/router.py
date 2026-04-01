@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_tenant_id, get_current_user
-from backend.core.schemas import CVReviewResult, CVUploadResponse, ParsedCV
+from backend.core.schemas import CVActionRequest, CVReviewRequest, CVReviewResult, CVUploadResponse, ParsedCV
 from backend.cv.service import parse_cv_to_structured_json, review_cv_against_rubric
 from backend.storage.database import get_db
 from backend.storage.models import CV, CVParsingResult, CVReviewResultDB, Lecturer, Student
@@ -51,6 +51,15 @@ def parse_cv(cv_id: int, domain: str = Form("unknown"), tenant_id: int = Depends
     return parsed
 
 
+@router.post("/parse", response_model=ParsedCV)
+def parse_cv_by_payload(
+    payload: CVActionRequest,
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> ParsedCV:
+    return parse_cv(payload.cv_id, payload.domain.value, tenant_id, db)
+
+
 @router.post("/{cv_id}/review", response_model=CVReviewResult)
 def review_cv(
     cv_id: int,
@@ -68,3 +77,12 @@ def review_cv(
     db.add(CVReviewResultDB(tenant_id=tenant_id, cv_id=cv.id, version=cv.version, review_json=review.model_dump(), score=review.overall_score))
     db.commit()
     return review
+
+
+@router.post("/review", response_model=CVReviewResult)
+def review_cv_by_payload(
+    payload: CVReviewRequest,
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> CVReviewResult:
+    return review_cv(payload.cv_id, payload.target_role, payload.jd_text, payload.domain.value, tenant_id, db)

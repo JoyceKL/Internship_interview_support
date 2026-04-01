@@ -7,15 +7,20 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_tenant_id
-from backend.core.schemas import AnalyticsResponse, AnalyticsSummary
+from backend.core.schemas import (
+    AnalyticsDistributionResponse,
+    AnalyticsIssuesResponse,
+    AnalyticsSummary,
+    AnalyticsSummaryResponse,
+    AnalyticsTrendsResponse,
+)
 from backend.storage.database import get_db
-from backend.storage.models import CVReviewResultDB, InterviewQuestionSet, Student
+from backend.storage.models import CV, CVReviewResultDB, InterviewQuestionSet, Student
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
-@router.get("/dashboard", response_model=AnalyticsResponse)
-def dashboard(
+def _collect_analytics_data(
     class_id: int | None = None,
     cohort_id: int | None = None,
     domain: str | None = None,
@@ -23,7 +28,7 @@ def dashboard(
     date_to: datetime | None = Query(None),
     tenant_id: int = Depends(get_current_tenant_id),
     db: Session = Depends(get_db),
-) -> AnalyticsResponse:
+) -> dict:
     student_query = db.query(Student).filter(Student.tenant_id == tenant_id)
     if class_id:
         student_query = student_query.filter(Student.class_id == class_id)
@@ -35,6 +40,11 @@ def dashboard(
     student_ids = [s.id for s in student_query.all()]
 
     review_query = db.query(CVReviewResultDB).filter(CVReviewResultDB.tenant_id == tenant_id)
+    if student_ids:
+        cv_ids_subquery = db.query(CV.id).filter(CV.student_id.in_(student_ids)).subquery()
+        review_query = review_query.filter(CVReviewResultDB.cv_id.in_(cv_ids_subquery))
+    else:
+        review_query = review_query.filter(CVReviewResultDB.cv_id == -1)
     if date_from:
         review_query = review_query.filter(CVReviewResultDB.created_at >= date_from)
     if date_to:
@@ -76,12 +86,88 @@ def dashboard(
         average_score=avg_score,
         total_interview_sets_generated=db.query(InterviewQuestionSet).filter(InterviewQuestionSet.tenant_id == tenant_id).count(),
     )
-    return AnalyticsResponse(
-        summary=summary,
-        score_distribution=score_distribution,
-        domain_distribution=domain_distribution,
-        common_cv_issues=common_issues,
-        class_comparison=class_cmp,
-        cohort_comparison=cohort_cmp,
-        monthly_usage_trend=monthly,
+    return {
+        "summary": summary,
+        "score_distribution": score_distribution,
+        "domain_distribution": domain_distribution,
+        "common_cv_issues": common_issues,
+        "class_comparison": class_cmp,
+        "cohort_comparison": cohort_cmp,
+        "monthly_usage_trend": monthly,
+    }
+
+
+@router.get("/summary", response_model=AnalyticsSummaryResponse)
+def summary(
+    class_id: int | None = None,
+    cohort_id: int | None = None,
+    domain: str | None = None,
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> AnalyticsSummaryResponse:
+    data = _collect_analytics_data(class_id, cohort_id, domain, date_from, date_to, tenant_id, db)
+    return AnalyticsSummaryResponse(summary=data["summary"])
+
+
+@router.get("/distribution", response_model=AnalyticsDistributionResponse)
+def distribution(
+    class_id: int | None = None,
+    cohort_id: int | None = None,
+    domain: str | None = None,
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> AnalyticsDistributionResponse:
+    data = _collect_analytics_data(class_id, cohort_id, domain, date_from, date_to, tenant_id, db)
+    return AnalyticsDistributionResponse(
+        score_distribution=data["score_distribution"],
+        domain_distribution=data["domain_distribution"],
     )
+
+
+@router.get("/issues", response_model=AnalyticsIssuesResponse)
+def issues(
+    class_id: int | None = None,
+    cohort_id: int | None = None,
+    domain: str | None = None,
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> AnalyticsIssuesResponse:
+    data = _collect_analytics_data(class_id, cohort_id, domain, date_from, date_to, tenant_id, db)
+    return AnalyticsIssuesResponse(common_cv_issues=data["common_cv_issues"])
+
+
+@router.get("/trends", response_model=AnalyticsTrendsResponse)
+def trends(
+    class_id: int | None = None,
+    cohort_id: int | None = None,
+    domain: str | None = None,
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> AnalyticsTrendsResponse:
+    data = _collect_analytics_data(class_id, cohort_id, domain, date_from, date_to, tenant_id, db)
+    return AnalyticsTrendsResponse(
+        class_comparison=data["class_comparison"],
+        cohort_comparison=data["cohort_comparison"],
+        monthly_usage_trend=data["monthly_usage_trend"],
+    )
+
+
+@router.get("/dashboard")
+def dashboard(
+    class_id: int | None = None,
+    cohort_id: int | None = None,
+    domain: str | None = None,
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    return _collect_analytics_data(class_id, cohort_id, domain, date_from, date_to, tenant_id, db)
