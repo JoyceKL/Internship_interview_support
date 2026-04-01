@@ -1,140 +1,164 @@
 # Internship Interview Support
 
-Repo hiện chứa đồng thời:
-- **V1 (MVP local Streamlit)** giữ nguyên để tương thích ngược.
-- **V2 (production-ready foundation)** backend FastAPI tách riêng, có auth JWT, multi-tenant, analytics, OpenAI structured outputs, versioning dữ liệu CV/review/interview.
+Repo này giữ **V1 Streamlit** và triển khai **V2 FastAPI**. Ver2 ưu tiên local UX: clone -> cấu hình `.env` -> `docker compose up -d` -> migrate -> dùng API ngay.
 
-## 1) Kiến trúc Ver2
+## Phase 1 — Audit nhanh V1/V2 hiện tại
+
+### Current architecture
+- `backend/`: FastAPI REST API (auth, students, cv, interview, analytics, exports).
+- `backend/storage`: SQLAlchemy models + Alembic migrations + seed.
+- `backend/integrations/openai/adapter.py`: OpenAI Responses API + structured JSON schema validation + retry.
+- `backend/prompts/domains/*.json`: FE/BE/DA/QA/BA/AI config-driven rubric/checklist/keywords/interview focus.
+- `app.py`, `services/*`, `parsers/*`: V1 Streamlit + business logic cũ (fallback / backward compatibility).
+
+### Reuse được
+- V1 parser/scoring/review/export vẫn tái sử dụng làm deterministic fallback khi OpenAI unavailable.
+- V2 API + models + migrations + tests đã có nền tảng tốt.
+- Domain configs đã có đủ 6 domain.
+
+### Cần refactor / chuẩn hóa thêm
+- Local run trước đây chưa rõ flow docker + migrate + seed.
+- Thiếu preflight scripts rõ ràng cho bash/PowerShell.
+- Một số bug test (password hashing backend, schema type legacy).
+
+### Technical debt
+- Analytics monthly trend đang dùng `strftime` (được cho SQLite; production PostgreSQL nên chuyển `date_trunc`).
+- Chưa có object storage abstraction (hiện local filesystem theo yêu cầu).
+
+### Migration risks
+- Khác biệt SQLite vs PostgreSQL query function (đặc biệt analytics time aggregation).
+- Nếu thiếu `OPENAI_API_KEY`, pipeline chuyển fallback deterministic (không fail toàn flow).
+
+## Phase 2+ — Migration plan Ver2
+1. **Stabilize local runtime**: `.env.example`, Dockerfile, compose, Makefile, preflight.
+2. **Backend API hardening**: auth/tenant guards, endpoint contracts, schema validation.
+3. **DB & migrations**: PostgreSQL schema, versioning CV/review/interview, seed/demo.
+4. **OpenAI pipeline**: Responses API + Structured Outputs + retry + fallback.
+5. **Domain-specific improvements**: FE/BE/DA/QA/BA/AI config-driven context.
+6. **Analytics & exports**: dashboard APIs + markdown/docx export.
+7. **Tests + e2e**: auth, tenant isolation, CRUD, schema validation, analytics, export.
+
+## Folder structure Ver2 (đang dùng)
 
 ```text
 backend/
-app/                      # compatibility namespace theo yêu cầu Ver2 (re-export từ backend/*)
-  api/                      # API router tổng
-  core/                     # config + shared schemas
-  auth/                     # JWT, dependency authn/authz
-  tenants/                  # tenant endpoints
-  users/                    # lecturer endpoints
-  students/                 # student CRUD
-  cv/                       # upload/parse/review + versioning
-  interviews/               # generate Q&A + versioning
-  analytics/                # dashboard JSON endpoints
-  prompts/                  # domain configs + prompt context
-  integrations/openai/      # adapter structured output + retry
-  storage/                  # SQLAlchemy models/session/seed
-  exports/                  # markdown/docx export
-  alembic/                  # migrations
-  tests/                    # v2 tests
+  api/
+  core/
+  auth/
+  tenants/
+  users/                # lecturer endpoints
+  students/
+  cv/
+  interviews/
+  analytics/
+  integrations/openai/
+  storage/
+  exports/
+  prompts/domains/
+  alembic/
+  tests/
+app/                    # compatibility namespace
+data/
+  uploads/cv/
+  uploads/jd/
+  exports/
+scripts/
 ```
 
-## 2) Chạy local
+---
 
+## How to run locally after clone (ngắn gọn)
+1. `git clone <repo>`
+2. `cp .env.example .env`
+3. Điền `OPENAI_API_KEY` trong `.env`
+4. `docker compose up -d`
+5. `make migrate-docker`
+6. `make seed-docker` (optional)
+7. Mở `http://localhost:8000/docs`
+
+---
+
+## Local setup chi tiết
+
+### 1) Clone + env
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+git clone <repo-url>
+cd Internship_interview_support
 cp .env.example .env
 ```
 
-### Run API (V2)
+### 2) Sửa `.env`
+Bắt buộc:
+- `OPENAI_API_KEY=<your_key>` (nếu bỏ trống, hệ thống dùng fallback deterministic)
+- giữ `DATABASE_URL` mặc định khi chạy docker compose.
+
+### 3) Preflight
+**bash**
 ```bash
-make run-api
-```
-Swagger: `http://localhost:8000/docs`
-
-### Run UI cũ (V1)
-```bash
-make run-ui
-```
-
-## 3) Database & Migration
-
-- Ver2 target: PostgreSQL.
-- Local test có thể dùng SQLite.
-
-```bash
-make migrate
-make seed
+make preflight
 ```
 
-## 4) Docker
-
-```bash
-docker compose up --build
+**Windows PowerShell**
+```powershell
+.\scripts\preflight.ps1
 ```
 
-## 5) Auth & Multi-tenant
+### 4) Start services
+```bash
+docker compose up -d --build
+```
 
-- Register lecturer: tự tạo tenant nếu chưa có.
-- Login trả access + refresh JWT.
-- `tenant_id` xuyên suốt model và query scope.
-- API layer dùng `get_current_user`, `get_current_tenant_id` để guard truy cập chéo tenant.
+### 5) Migrate database
+```bash
+make migrate-docker
+```
 
-## 6) OpenAI Integration
+### 6) Seed demo data (optional)
+```bash
+make seed-docker
+```
 
-3 tác vụ chính:
-- `parse_cv_to_structured_json`
-- `review_cv_against_rubric`
-- `generate_interview_questions`
+### 7) Verify health/docs
+- Health: `http://localhost:8000/health`
+- Swagger: `http://localhost:8000/docs`
 
-Cơ chế:
-- Structured output theo JSON schema (Pydantic schema).
-- Validate sau khi nhận output.
-- Retry có kiểm soát (`OPENAI_MAX_RETRIES`).
-- Nếu thất bại: fallback deterministic từ logic V1.
-- Nguyên tắc chống bịa: thiếu dữ liệu => `unknown` hoặc `cần bổ sung`.
+Quick check:
+```bash
+curl http://localhost:8000/health
+```
 
-## 7) Domain-specific engine
+Expected:
+```json
+{"status":"ok"}
+```
 
-Domain hỗ trợ: **FE, BE, DA, QA, BA, AI**.
-Mỗi domain có config riêng trong `backend/prompts/domains/*.json`:
-- rubric
-- keyword packs
-- checklist
-- interview focus
-
-## 8) Endpoint chính
-
+## API chính
 - `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`
-- `/tenants/current`
-- `/lecturers`
-- `/students` (POST/GET/PATCH)
-- `/cv/upload`, `/cv/parse` (alias: `/cv/{cv_id}/parse`), `/cv/review` (alias: `/cv/{cv_id}/review`)
-- `/interview/generate` (alias: `/interview/{cv_id}/generate`)
-- `/analytics/summary`, `/analytics/distribution`, `/analytics/issues`, `/analytics/trends` (legacy aggregate: `/analytics/dashboard`)
+- `/students`
+- `/cv/upload`, `/cv/parse`, `/cv/review`
+- `/interview/generate`
+- `/analytics/summary`, `/analytics/distribution`, `/analytics/issues`, `/analytics/trends`
 - `/exports/{cv_id}/markdown`, `/exports/{cv_id}/docx`
 - `/health`
 
-## 9) Test
+## Storage local
+- `./data/uploads/cv`
+- `./data/uploads/jd`
+- `./data/exports`
 
+DB chỉ lưu metadata/path file.
+
+## Testing
 ```bash
 make test
 ```
 
-Bao gồm:
-- auth flow
-- tenant isolation
-- schema validation
-- export tests
-- e2e flow: register -> login -> create student -> upload CV -> parse -> review -> generate Q&A -> analytics
+## Troubleshooting
+- **`docker compose up` fail vì port 5432 bận**: đổi mapping host port của db trong `docker-compose.yml`.
+- **`/health` không lên**: kiểm tra `docker compose logs api`.
+- **Migrate lỗi connect db**: chờ db healthy rồi chạy lại `make migrate-docker`.
+- **Không có OPENAI key**: pipeline vẫn chạy bằng fallback (không sinh lỗi hard-fail).
 
-## 10) Tích hợp frontend
-
-- V1 Streamlit có thể gọi REST API dần thay cho gọi trực tiếp service local.
-- Khuyến nghị rollout theo bước:
-  1. streamlit upload + auth gọi backend.
-  2. chuyển parse/review/qa sang API.
-  3. chuyển lịch sử + dashboard sang API.
-
-## 11) Lưu ý kỹ thuật
-
-- Trong môi trường production PostgreSQL, analytics monthly trend nên dùng `date_trunc` thay cho `strftime` (TODO).
-- V1 logic vẫn được tái sử dụng làm fallback để giữ khả năng chạy end-to-end ổn định.
-
-
-## 12) Cấu trúc dữ liệu local
-
-```text
-data/uploads/cv
-data/uploads/jd
-data/exports
-```
+## Notes
+- Mọi output JSON của pipeline parse/review/interview đều đi qua Pydantic validation.
+- Prompt/pipeline tuân thủ nguyên tắc: không bịa dữ liệu; thiếu dữ liệu trả `unknown` hoặc `cần bổ sung`.

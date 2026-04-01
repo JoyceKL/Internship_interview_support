@@ -10,6 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d interview_support"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build: .
@@ -19,8 +24,11 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/interview_support
     ports:
       - "8000:8000"
+    volumes:
+      - ./data:/app/data
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   pg_data:
