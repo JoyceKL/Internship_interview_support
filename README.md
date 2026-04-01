@@ -97,9 +97,9 @@ Mỗi domain có config riêng trong `backend/prompts/domains/*.json`:
 - `/tenants/current`
 - `/lecturers`
 - `/students` (POST/GET/PATCH)
-- `/cv/upload`, `/cv/{cv_id}/parse`, `/cv/{cv_id}/review`
-- `/interview/{cv_id}/generate`
-- `/analytics/dashboard`
+- `/cv/upload`, `/cv/parse` (alias: `/cv/{cv_id}/parse`), `/cv/review` (alias: `/cv/{cv_id}/review`)
+- `/interview/generate` (alias: `/interview/{cv_id}/generate`)
+- `/analytics/summary`, `/analytics/distribution`, `/analytics/issues`, `/analytics/trends` (legacy aggregate: `/analytics/dashboard`)
 - `/exports/{cv_id}/markdown`, `/exports/{cv_id}/docx`
 - `/health`
 

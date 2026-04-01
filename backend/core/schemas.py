@@ -127,6 +127,20 @@ class CVUploadResponse(BaseModel):
     file_name: str
 
 
+class CVActionRequest(BaseModel):
+    cv_id: int
+    domain: TargetDomain = TargetDomain.unknown
+
+
+class CVReviewRequest(CVActionRequest):
+    target_role: str
+    jd_text: str = ""
+
+
+class InterviewGenerateRequest(CVActionRequest):
+    mode: Literal["normal", "deep"] = "normal"
+
+
 class AnalyticsSummary(BaseModel):
     total_students: int
     total_cv_reviewed: int
@@ -134,11 +148,20 @@ class AnalyticsSummary(BaseModel):
     total_interview_sets_generated: int
 
 
-class AnalyticsResponse(BaseModel):
+class AnalyticsSummaryResponse(BaseModel):
     summary: AnalyticsSummary
+
+
+class AnalyticsDistributionResponse(BaseModel):
     score_distribution: list[dict]
     domain_distribution: list[dict]
+
+
+class AnalyticsIssuesResponse(BaseModel):
     common_cv_issues: list[dict]
+
+
+class AnalyticsTrendsResponse(BaseModel):
     class_comparison: list[dict]
     cohort_comparison: list[dict]
     monthly_usage_trend: list[dict]

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_tenant_id
-from backend.core.schemas import InterviewQuestionSet
+from backend.core.schemas import InterviewGenerateRequest, InterviewQuestionSet
 from backend.cv.service import parse_cv_to_structured_json
 from backend.interviews.service import generate_interview_questions
 from backend.storage.database import get_db
@@ -39,3 +39,12 @@ def generate(
     )
     db.commit()
     return result
+
+
+@router.post("/generate", response_model=InterviewQuestionSet)
+def generate_by_payload(
+    payload: InterviewGenerateRequest,
+    tenant_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> InterviewQuestionSet:
+    return generate(payload.cv_id, payload.mode, payload.domain.value, tenant_id, db)
