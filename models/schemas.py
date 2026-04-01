@@ -65,7 +65,7 @@ class QuestionItem(BaseModel):
 
 
 class InterviewQAResult(BaseModel):
-    student_info: Dict[str, str]
+    student_info: Dict[str, object]
     target_role: str
     language: str
     question_set: List[QuestionItem]
